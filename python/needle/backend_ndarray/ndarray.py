@@ -246,7 +246,13 @@ class NDArray:
         """
 
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if np.prod(self._shape) != np.prod(new_shape):
+            raise ValueError("Array dimension not match reshape!")
+        
+        if not self.is_compact():
+            raise ValueError("Not compact array, cannot reshape!")
+
+        return NDArray.make(new_shape, device=self._device, handle=self._handle)
         ### END YOUR SOLUTION
 
     def permute(self, new_axes):
@@ -271,7 +277,10 @@ class NDArray:
         """
 
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        new_shape = tuple([self._shape[p] for p in new_axes])
+        new_strides = tuple([self._strides[p] for p in new_axes])
+
+        return NDArray.make(new_shape, strides=new_strides, device=self._device, handle=self._handle)
         ### END YOUR SOLUTION
 
     def broadcast_to(self, new_shape):
@@ -294,7 +303,14 @@ class NDArray:
             point to the same memory as the original array.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        new_strides = list(self._strides)
+        for i in range(len(self._shape)):
+            if self._shape[i] != 1:
+                assert self._shape[i] == new_shape[i], "cannot broadcast"
+            elif self._shape[i] != new_shape[i]:
+                new_strides[i] = 0
+
+        return NDArray.make(new_shape, strides=tuple(new_strides), device=self._device, handle=self._handle)
         ### END YOUR SOLUTION
 
     ### Get and set elements
@@ -361,7 +377,17 @@ class NDArray:
         assert len(idxs) == self.ndim, "Need indexes equal to number of dimensions"
 
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        total_offset = 0
+        new_strides = list(self._strides)
+        new_shape = list(self._shape)
+        for i, idx in enumerate(idxs):
+
+            total_offset += idx.start * new_strides[i]
+            new_strides[i] *= idx.step
+
+            new_shape[i] = (idx.stop - idx.start) // idx.step + int((idx.stop - idx.start) % idx.step != 0)
+        
+        return NDArray.make(tuple(new_shape), strides=tuple(new_strides), device=self._device, handle=self._handle, offset=total_offset)
         ### END YOUR SOLUTION
 
     def __setitem__(self, idxs, other):
@@ -572,7 +598,19 @@ class NDArray:
         Note: compact() before returning.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        assert len(axes) <= len(self.shape)
+        if not self.is_compact():
+            raise ValueError("Not compact array, cannot flip!")
+        
+        new_strides = list(self.strides)
+        for axis in axes:
+            new_strides[axis] *= -1
+        new_strides = tuple(new_strides)
+
+        new_offset = sum([(self.shape[axis] - 1) * self.strides[axis] for axis in axes])
+        return NDArray.make(
+            self.shape, new_strides, self._device, self._handle, new_offset
+        ).compact()
         ### END YOUR SOLUTION
 
 
@@ -583,7 +621,13 @@ class NDArray:
         axes = ( (0, 0), (1, 1), (0, 0)) pads the middle axis with a 0 on the left and right side.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        assert len(axes) == len(self.shape)
+        
+        new_shape = tuple([l + n + r for (l, r), n in zip(axes, self.shape)])
+        arr = self.device.full(new_shape, 0)
+        center = tuple([slice(l, l + n) for (l, r), n in zip(axes, self.shape)])
+        arr[center] = self
+        return arr
         ### END YOUR SOLUTION
 
 

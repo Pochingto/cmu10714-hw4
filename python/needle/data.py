@@ -26,7 +26,10 @@ class RandomFlipHorizontal(Transform):
         """
         flip_img = np.random.rand() < self.p
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if flip_img:
+            return np.flip(img, axis=1)
+        else:
+            return img
         ### END YOUR SOLUTION
 
 
@@ -46,7 +49,23 @@ class RandomCrop(Transform):
             low=-self.padding, high=self.padding + 1, size=2
         )
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        reverted_shift_x = -shift_x
+        reverted_shift_y = -shift_y
+
+        img = np.roll(img, shift=reverted_shift_x, axis=0)
+        img = np.roll(img, shift=reverted_shift_y, axis=1)
+
+        if reverted_shift_x >= 0:
+            img[:reverted_shift_x, :, :] = 0.0
+        else:
+            img[reverted_shift_x:, :, :] = 0.0
+            
+        if reverted_shift_y >= 0:
+            img[:, :reverted_shift_y, :] = 0.0
+        else:
+            img[:, reverted_shift_y:, :] = 0.0
+
+        return img
         ### END YOUR SOLUTION
 
 
@@ -94,11 +113,13 @@ class DataLoader:
         dataset: Dataset,
         batch_size: Optional[int] = 1,
         shuffle: bool = False,
+        device = None
     ):
 
         self.dataset = dataset
         self.shuffle = shuffle
         self.batch_size = batch_size
+        self.device = device
         if not self.shuffle:
             self.ordering = np.array_split(
                 np.arange(len(dataset)), range(batch_size, len(dataset), batch_size)
@@ -106,15 +127,51 @@ class DataLoader:
 
     def __iter__(self):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.iteration = 0
+        self.n_samples = 0
+
+        if self.shuffle:
+
+            idxs = np.arange(len(self.dataset))
+            np.random.shuffle(idxs)
+            self.ordering = np.array_split(idxs, 
+                                           range(self.batch_size, len(self.dataset), self.batch_size))
         ### END YOUR SOLUTION
         return self
 
     def __next__(self):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        idxs = self.ordering[self.iteration]
+        self.iteration += 1
+        self.iteration %= len(self.ordering)
+
+        self.n_samples += self.batch_size
+        if self.n_samples > len(self.dataset):
+            raise StopIteration
+
+        batch = []
+        # print(idxs)
+        for i in range(len(self.dataset[0])):
+            # data = [self.dataset[idx][i] for idx in idxs]
+            # print(len(data))
+            # print(len(data[0]))
+            # print(self.dataset[0][i].shape)
+            # print(Tensor([self.dataset[idx][i] for idx in idxs]).shape)
+            batch.append(Tensor([self.dataset[idx][i] for idx in idxs], device=self.device))
+
+        # for b in batch:
+        #     print(b.shape)
+
+        return tuple(batch)
         ### END YOUR SOLUTION
 
+def parse_int_from_32bit_hex(binary):
+    integer = 0
+    index = len(binary) - 1
+    for i, b in enumerate(binary):
+        integer += b * (256 ** (index - i))
+
+    return integer
 
 class MNISTDataset(Dataset):
     def __init__(
@@ -124,17 +181,42 @@ class MNISTDataset(Dataset):
         transforms: Optional[List] = None,
     ):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        super().__init__(transforms=transforms)
+        import gzip
+        with gzip.open(image_filename,'rb') as fin:        
+            magic_number = parse_int_from_32bit_hex(fin.read(4))
+            num_imgs = parse_int_from_32bit_hex(fin.read(4))
+            shape1 = parse_int_from_32bit_hex(fin.read(4))
+            shape2 = parse_int_from_32bit_hex(fin.read(4))
+
+            image_bytes = fin.read()
+            images = np.frombuffer(image_bytes, dtype=np.uint8)
+            images = images.reshape((num_imgs, shape1, shape2, 1))
+            images = images/ 255.0
+            # images = images.astype(np.float64)
+            images = images.astype(np.float32)
+
+        with gzip.open(label_filename,'rb') as fin:        
+            magic_number = parse_int_from_32bit_hex(fin.read(4))
+            num_labels = parse_int_from_32bit_hex(fin.read(4))
+
+            labels_bytes = fin.read()
+            labels = np.frombuffer(labels_bytes, dtype=np.uint8)
+
+        self.images = images
+        self.labels = labels
+
+        self.transforms = transforms
         ### END YOUR SOLUTION
 
     def __getitem__(self, index) -> object:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return self.apply_transforms(self.images[index]), self.labels[index]
         ### END YOUR SOLUTION
 
     def __len__(self) -> int:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return len(self.images)
         ### END YOUR SOLUTION
 
 
@@ -156,7 +238,26 @@ class CIFAR10Dataset(Dataset):
         y - numpy array of labels
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        super().__init__(transforms=transforms)
+        data_files = []
+        if train:
+            data_files = [os.path.join(base_folder, f"data_batch_{i}") for i in range(1, 6)]
+        else:
+            data_files = [os.path.join(base_folder, f"test_batch")]
+
+        X = np.array([]).reshape(0, 3072)
+        y = []
+        for data_file in data_files:
+            with open(data_file, 'rb') as fo:
+                data_dict = pickle.load(fo, encoding='bytes')
+                X = np.concatenate([X, data_dict[b'data'] / 255.0], axis=0)
+                y += data_dict[b'labels']
+
+        self.X = X.reshape((-1, 3, 32, 32))
+        self.y = y
+
+        print("X shape: ", self.X.shape)
+        print("len y: ", len(self.y))
         ### END YOUR SOLUTION
 
     def __getitem__(self, index) -> object:
@@ -165,7 +266,12 @@ class CIFAR10Dataset(Dataset):
         Image should be of shape (3, 32, 32)
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        image = self.X[index]
+        label = self.y[index]
+        if self.transforms:
+            image = self.apply_transforms(image)
+
+        return image, label
         ### END YOUR SOLUTION
 
     def __len__(self) -> int:
@@ -173,7 +279,7 @@ class CIFAR10Dataset(Dataset):
         Returns the total number of examples in the dataset
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return len(self.y)
         ### END YOUR SOLUTION
 
 

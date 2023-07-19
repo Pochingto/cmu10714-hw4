@@ -315,7 +315,7 @@ class Tensor(Value):
 
     def __pow__(self, other):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return needle.ops.PowerScalar(other)(self)
         ### END YOUR SOLUTION
 
     def __sub__(self, other):
@@ -377,7 +377,31 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    adjoint = None
+    for node in reverse_topo_order:
+
+        # print("current operation: ", node.op)
+        # print("node shape: ", node.shape)
+        # print(node.realize_cached_data().dtype)
+        # assert node.realize_cached_data().dtype == array_api.dtype("float32")
+        
+        adjoint = sum_node_list(node_to_output_grads_list[node])
+        node.grad = adjoint
+        # print("grad shape: ", adjoint.shape)
+
+        if node.op is None:
+            continue
+
+        grad_tuple = node.op.gradient_as_tuple(adjoint, node)
+
+        for input_node, grad in zip(node.inputs, grad_tuple):
+            if not input_node in node_to_output_grads_list:
+                node_to_output_grads_list[input_node] = list()
+
+            # print("appending ", input_node.shape, grad.shape)
+            node_to_output_grads_list[input_node].append(grad)
+
+    return adjoint
     ### END YOUR SOLUTION
 
 
@@ -390,14 +414,28 @@ def find_topo_sort(node_list: List[Value]) -> List[Value]:
     sort.
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    visited = set()
+    topo_order = list()
+
+    for node in node_list:
+        topo_sort_dfs(node, visited, topo_order)
+
+    return topo_order
     ### END YOUR SOLUTION
 
 
 def topo_sort_dfs(node, visited, topo_order):
     """Post-order DFS"""
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    if node in visited:
+        return 
+
+    for parent in node.inputs:
+        topo_sort_dfs(parent, visited, topo_order)
+
+    visited.add(node)
+    topo_order.append(node)
+    return
     ### END YOUR SOLUTION
 
 
