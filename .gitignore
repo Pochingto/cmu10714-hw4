@@ -1,0 +1,7 @@
+data/
+build/
+CMakeFiles/
+.vscode/
+**/__pycache__
+
+*.so

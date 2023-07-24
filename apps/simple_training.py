@@ -140,6 +140,7 @@ def epoch_general_ptb(data, model: nn.Module, seq_len=40, loss_fn=nn.SoftmaxLoss
     h = None
     for i in range(0, nbatch - 1, seq_len):
         X, y = ndl.data.get_batch(data, i, bptt=seq_len, device=device, dtype=dtype)
+        batch_size = y.shape[0]
         pred, h = model(X, h)
         if isinstance(h, tuple):
             h = (h[0].detach(), h[1].detach())
@@ -147,8 +148,8 @@ def epoch_general_ptb(data, model: nn.Module, seq_len=40, loss_fn=nn.SoftmaxLoss
             h = h.detach()
 
         loss = loss_fn(pred, y)
-        total_loss += loss.detach().numpy()
-        total_samples += y.shape[0] # batch_size
+        total_loss += loss.detach().numpy() * batch_size
+        total_samples += batch_size
         total_correct += np.sum(pred.numpy().argmax(axis = 1) == y.numpy())
 
         if opt is not None:

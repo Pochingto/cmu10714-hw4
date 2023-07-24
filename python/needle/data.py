@@ -370,7 +370,7 @@ class Corpus(object):
                 words = line.split()
                 for word in words:
                     ids.append(self.dictionary.add_word(word))
-                    ids.append(eos_id)
+                ids.append(eos_id)
         return ids
         ### END YOUR SOLUTION
 
