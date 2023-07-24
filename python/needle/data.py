@@ -319,7 +319,14 @@ class Dictionary(object):
         Returns the word's unique ID.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        uid = None
+        if not word in self.word2idx:
+            uid = len(self.idx2word)
+            self.word2idx[word] = uid
+            self.idx2word.append(word)
+        else:
+            uid = self.idx2word.index(word)
+        return uid
         ### END YOUR SOLUTION
 
     def __len__(self):
@@ -327,7 +334,7 @@ class Dictionary(object):
         Returns the number of unique words in the dictionary.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return len(self.idx2word)
         ### END YOUR SOLUTION
 
 
@@ -354,7 +361,17 @@ class Corpus(object):
         ids: List of ids
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        ids = []
+        eos_id = self.dictionary.add_word("<eos>")
+        with open(path, "r") as f:
+            for i, line in enumerate(f):
+                if max_lines is not None and i >= max_lines:
+                    break
+                words = line.split()
+                for word in words:
+                    ids.append(self.dictionary.add_word(word))
+                    ids.append(eos_id)
+        return ids
         ### END YOUR SOLUTION
 
 
@@ -375,7 +392,8 @@ def batchify(data, batch_size, device, dtype):
     Returns the data as a numpy array of shape (nbatch, batch_size).
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    num_batch = len(data) // batch_size
+    return np.array(data[:num_batch * batch_size], dtype=dtype).reshape((num_batch, batch_size))
     ### END YOUR SOLUTION
 
 
@@ -399,5 +417,16 @@ def get_batch(batches, i, bptt, device=None, dtype=None):
     target - Tensor of shape (bptt*bs,) with cached data as NDArray
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    seq_len = batches.shape[0]
+    X = None
+    y = None
+    if i + bptt + 1 < seq_len:
+        X = batches[i : i + bptt, :]
+        y = batches[i + 1 : i + bptt + 1, :]
+    elif i + 1 < seq_len:
+        X = batches[i : -1, :]
+        y = batches[i + 1:, :]
+    else:
+        raise Exception("index out of range (get_batch).")
+    return Tensor(X, device=device, dtype=dtype), Tensor(y.flatten(), device=device, dtype=dtype)
     ### END YOUR SOLUTION
